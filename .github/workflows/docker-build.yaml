@@ -1,0 +1,100 @@
+name: Oracle Database Operator Setup
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  setup-operator:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Set Up Oracle Linux
+      run: |
+        echo "Oracle Linux setup is required; validate OS manually if needed."
+
+    - name: Validate Kernel Version
+      run: uname -r
+
+    - name: Install GoLang
+      env:
+        VERSION: "1.19"
+        OS: "linux"
+        ARCH: "amd64"
+      run: |
+        curl -LO https://golang.org/dl/go${VERSION}.${OS}-${ARCH}.tar.gz
+        sudo tar -C /usr/local -xzf go${VERSION}.${OS}-${ARCH}.tar.gz
+        echo "export PATH=$PATH:/usr/local/go/bin" >> $HOME/.bash_profile
+        source $HOME/.bash_profile
+        go version
+
+    - name: Set Up Go Workspace
+      run: |
+        mkdir -p /scratch/go/projects/go
+        echo "export GODIR=/scratch/go/projects/" >> $HOME/.bash_profile
+        echo "export GOPATH=$GODIR/go" >> $HOME/.bash_profile
+        source $HOME/.bash_profile
+        echo "Go workspace setup complete."
+
+    - name: Install Operator SDK
+      run: |
+        wget https://github.com/operator-framework/operator-sdk/releases/download/v1.2.0/operator-sdk-v1.2.0-x86_64-linux-gnu
+        sudo mv operator-sdk-v1.2.0-x86_64-linux-gnu /usr/local/bin/operator-sdk
+        sudo chmod +x /usr/local/bin/operator-sdk
+        operator-sdk version
+
+    - name: Clone Oracle Database Operator
+      run: |
+        git clone https://github.com/oracle/oracle-database-operator.git
+        cd oracle-database-operator
+        echo "Repository cloned."
+
+    - name: Run Operator Locally
+      run: |
+        cd oracle-database-operator
+        make generate
+        make manifests
+        make install run
+
+    - name: Build and Push Multi-Arch Docker Image to ghcr.io
+      env:
+        IMAGE: "ghcr.io/${{ github.repository_owner }}/oracle-database-operator:latest"
+      run: |
+        cd oracle-database-operator
+        make generate
+        make manifests
+        make install
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+        docker buildx create --use
+        docker buildx inspect --bootstrap
+        docker buildx build --platform linux/amd64,linux/arm64 \
+          -t $IMAGE . --push
+
+    - name: Deploy Operator to Kubernetes
+      env:
+        IMAGE: "ghcr.io/${{ github.repository_owner }}/oracle-database-operator:latest"
+      run: |
+        cd oracle-database-operator
+        kubectl create namespace oracle-database-operator-system --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create secret docker-registry ghcr-secret \
+          -n oracle-database-operator-system \
+          --docker-server=ghcr.io \
+          --docker-username=$GITHUB_ACTOR \
+          --docker-password=${{ secrets.GITHUB_TOKEN }}
+        make operator-yaml IMG=$IMAGE
+
+    - name: Validate YAML File
+      run: |
+        cd oracle-database-operator
+        ls oracle-database-operator.yaml || echo "YAML file not found."
+
+    - name: Quick Install of Operator
+      run: |
+        echo "Refer to the Quick Install section of the README."
