@@ -37,8 +37,8 @@ jobs:
 
     - name: Set Up Go Workspace
       run: |
-        mkdir -p /scratch/go/projects/go
-        echo "export GODIR=/scratch/go/projects/" >> $HOME/.bash_profile
+        mkdir -p go/projects/go
+        echo "export GODIR=go/projects/" >> $HOME/.bash_profile
         echo "export GOPATH=$GODIR/go" >> $HOME/.bash_profile
         source $HOME/.bash_profile
         echo "Go workspace setup complete."
