@@ -12,6 +12,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  BUILDER_IMG: golang:1.20
+  INSTALL_GO: false
 
 jobs:
   build:
@@ -64,6 +66,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            BUILDER_IMG=${{ env.BUILDER_IMG }}
+            INSTALL_GO=${{ env.INSTALL_GO }}
           
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@0.29.0
