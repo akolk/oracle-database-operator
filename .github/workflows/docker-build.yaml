@@ -12,7 +12,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  BUILDER_IMG: golang:1.20
+  BUILDER_IMG: golang:1.21
   INSTALL_GO: false
 
 jobs:
